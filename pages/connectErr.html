@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>KAHOOO</title>
+    </head>
+    <body>
+        <p>There was an error connecting, try again.</p>
+        <button onclick="ConnectToSpotify()">Connect To Spotify</button>
+
+        <script>
+            function ConnectToSpotify() {
+                window.open(`https://accounts.spotify.com/authorize?response_type=code&client_id=${encodeURIComponent("#{client_id}")}&scope=${encodeURIComponent("#{scope}")}&redirect_uri=${encodeURIComponent("#{redirect_uri}")}&state=${encodeURIComponent("#{state}")}`)
+                window.close()
+            }
+        </script>
+    </body>
+</html>

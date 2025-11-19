@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>KAHOOO</title>
+    </head>
+    <body>
+        <div>Name: <span id="name">-</span></div>
+        <img src="" id="img">
+        <div>Access Token: <span id="acctok">-</span></div>
+        <div>Refresh Token: <span id="reftok">-</span></div>
+        <div>Head: <span id="head">-</span></div>
+        <div>Playlist ID: <span id="playlistID">-</span></div>
+        <div>Playlist URL: <a id="playlistURL">-</a></div>
+        <div>Presentation ID: <span id="presentationID">-</span></div>
+        <div>Presentation URL: <a id="presentationURL">-</a></div>
+
+        <br>
+
+        <p>You can access this page at any time by reconnecting your account.</p>
+
+        <script>
+            Main()
+            async function Main() {
+                var userDataReq = await fetch(`/userdat${document.location.search}`)
+                var userData = await userDataReq.json()
+                
+                document.getElementById("name").innerText = userData.name
+                document.getElementById("img").src = userData.picture
+                document.getElementById("acctok").innerText = userData.access_token
+                document.getElementById("reftok").innerText = userData.refresh_token
+                document.getElementById("playlistID").innerText = userData.playlistID
+                document.getElementById("playlistURL").innerText = userData.playlistURL
+                document.getElementById("playlistURL").href = userData.playlistURL
+                document.getElementById("presentationID").innerText = userData.presentationID
+                document.getElementById("presentationURL").innerText = userData.presentationURL
+                document.getElementById("presentationURL").href = userData.presentationURL
+            }
+        </script>
+    </body>
+</html>
