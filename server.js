@@ -13,6 +13,8 @@ var connectErrPage = ""
 var authRedirectPage = ""
 var profilePage = ""
 
+var playlistCover = ""
+
 var sampleTracks = [
     "1V6XT65BE1jfncLXl2Nxew",
     "5jSx2yxNEB4xK2itDspwgN",
@@ -124,6 +126,8 @@ async function Main() {
 
     profilePage = fs.readFileSync('./pages/profile.html').toString('utf8')
 
+    playlistCover = fs.readFileSync('./playlistCover.jpg').toString('base64')
+
     server.listen(8080)
 }
 
@@ -139,30 +143,38 @@ async function GenerateUser(user, accessToken) {
         presentationURL: ""
     }
 
-//playlistID: "",
-      //  playlistURL: "",
-
     if (headUser == undefined) headUser = userEntry
 
-    var createdPlaylist = await SendRequest(`https://api.spotify.com/v1/users/${headUser.id}/playlists?name=abc`, {
+    var createdPlaylist = await SendSpotifyRequest(`https://api.spotify.com/v1/users/${headUser.id}/playlists`, {
         method: "POST",
         body: JSON.stringify({name: `Kahoot Player (${user.display_name})`, description: user.id, public: false}),
         headers: {
-            "Authorization": "Bearer " + accessToken.access_token,
+            "Authorization": "Bearer " + headUser.access_token,
             "Content-Type": "application/json"
         }
-    }, user)
+    }, headUser)
 
     userEntry.playlistID = createdPlaylist.id
     userEntry.playlistURL = createdPlaylist.external_urls.spotify
+
+    //console.log(playlistCover)
+    await SendSpotifyRequest(`https://api.spotify.com/v1/playlists/${userEntry.playlistID}/images`, {
+        method: "PUT",
+        headers: {
+            "Authorization": `Bearer ${headUser.access_token}`,
+            "Content-Type": "image/jpeg"
+        },
+        body: playlistCover
+    }, headUser)
 
     users[user.id] = userEntry
 
     return userEntry
 }
 
-async function SendRequest(url, params, user) {
+async function SendSpotifyRequest(url, params, user) {
     var request = await fetch(url, params)
+    console.log(`${url} -> ${request.status}`)
     if (request.ok) {
         var response = await request.text()
         if (response.length > 0)
@@ -182,7 +194,7 @@ async function SendRequest(url, params, user) {
         user.access_token = refreshedTokens.access_token
         if (refreshedTokens.refresh_token != undefined) user.refresh_token = refreshedTokens.refresh_token
         
-        return await SendRequest(url, params, user)
+        return await SendSpotifyRequest(url, params, user)
     } else {
         var response = await request.text()
         console.log(`${request.status} - ${response}`)
@@ -191,7 +203,7 @@ async function SendRequest(url, params, user) {
 }
 
 async function GetPlayingSong(user) {
-    var playbackState = await SendRequest("https://api.spotify.com/v1/me/player", {
+    var playbackState = await SendSpotifyRequest("https://api.spotify.com/v1/me/player", {
         method: "GET",
         headers: {
             "authorization": "Authorization: Bearer " + user.access_token
@@ -225,10 +237,14 @@ async function GetPlayingSong(user) {
 }
 
 async function SetPlaylistTracks(user, tracks) {
-    await SendRequest(`https://api.spotify.com/v1/playlists/${user.playlistID}/tracks?uris=${encodeURIComponent(tracks.map(track => `spotify:track:${track}`).join(','))}`, {
+    await SendSpotifyRequest(`https://api.spotify.com/v1/playlists/${user.playlistID}/tracks?uris=${encodeURIComponent(tracks.map(track => `spotify:track:${track}`).join(','))}`, {
         method: "PUT",
         headers: {
             "Authorization": `Bearer ${headUser.access_token}`,
         }
-    })
+    }, user)
+}
+
+async function KahootHandshake(pin) {
+
 }

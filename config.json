@@ -2,7 +2,7 @@
     "spotify": {
         "clientID": "this will be a random looking string",
         "clientSecret": "this will be a random looking string (don't share with anyone)",
-        "scope": "user-library-modify playlist-modify-private playlist-modify-public user-read-currently-playing user-read-playback-state",
+        "scope": "ugc-image-upload user-library-modify playlist-modify-private playlist-modify-public user-read-currently-playing user-read-playback-state",
         "redirectURI": "https://www.mycoolwebsite.com/auth",
         "state": "password"
     }
