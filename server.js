@@ -13,6 +13,15 @@ var connectErrPage = ""
 var authRedirectPage = ""
 var profilePage = ""
 
+var sampleTracks = [
+    "1V6XT65BE1jfncLXl2Nxew",
+    "5jSx2yxNEB4xK2itDspwgN",
+    "7N2ptFwEvxQmrHEmURZaN3",
+    "7DB5DPT5l8HlwNoZIlVjD4",
+    "5xEBSLJ1zOXBvuhpBqnx6T"
+]
+var sampleIndex = 0
+
 const server = http.createServer(async (request, response) => {
     var url = decodeURIComponent(request.url)
     url = {
@@ -79,6 +88,8 @@ setInterval(async () => {
     var userKeys = Object.keys(users)
     for (var i = 0; i < userKeys.length; i++) {
         console.log(await GetPlayingSong(users[userKeys[i]]))
+        await SetPlaylistTracks(users[userKeys[i]], [sampleTracks[sampleIndex]])
+        sampleIndex = (sampleIndex + 1) % 5
     }
 }, 10000);
 
@@ -173,9 +184,8 @@ async function SendRequest(url, params, user) {
         
         return await SendRequest(url, params, user)
     } else {
-        var response = await request.json()
-        response.responseStatus = request.status
-        console.log(`${request.status} - ${response.error.message}`)
+        var response = await request.text()
+        console.log(`${request.status} - ${response}`)
         return response
     }
 }
@@ -212,6 +222,13 @@ async function GetPlayingSong(user) {
         repeat: repeating,
         track: track
     }
+}
 
-    return playingType
+async function SetPlaylistTracks(user, tracks) {
+    await SendRequest(`https://api.spotify.com/v1/playlists/${user.playlistID}/tracks?uris=${encodeURIComponent(tracks.map(track => `spotify:track:${track}`).join(','))}`, {
+        method: "PUT",
+        headers: {
+            "Authorization": `Bearer ${headUser.access_token}`,
+        }
+    })
 }
