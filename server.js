@@ -1,5 +1,6 @@
 const http = require('http')
 const fs = require('fs')
+const ws = require('ws')
 
 /**
  * @type {{spotify:{clientID:string,clientSecret:string,scope:string,redirectURI:string,state:string}}}
@@ -15,14 +16,9 @@ var profilePage = ""
 
 var playlistCover = ""
 
-var sampleTracks = [
-    "1V6XT65BE1jfncLXl2Nxew",
-    "5jSx2yxNEB4xK2itDspwgN",
-    "7N2ptFwEvxQmrHEmURZaN3",
-    "7DB5DPT5l8HlwNoZIlVjD4",
-    "5xEBSLJ1zOXBvuhpBqnx6T"
+var activeGames = [
+    {pin: "", owner: "", song: ""}
 ]
-var sampleIndex = 0
 
 const server = http.createServer(async (request, response) => {
     var url = decodeURIComponent(request.url)
@@ -89,9 +85,9 @@ setInterval(async () => {
 
     var userKeys = Object.keys(users)
     for (var i = 0; i < userKeys.length; i++) {
-        console.log(await GetPlayingSong(users[userKeys[i]]))
-        await SetPlaylistTracks(users[userKeys[i]], [sampleTracks[sampleIndex]])
-        sampleIndex = (sampleIndex + 1) % 5
+        //console.log(await GetPlayingSong(users[userKeys[i]]))
+        //await SetPlaylistTracks(users[userKeys[i]], [sampleTracks[sampleIndex]])
+        //sampleIndex = (sampleIndex + 1) % 5
     }
 }, 10000);
 
@@ -129,6 +125,11 @@ async function Main() {
     playlistCover = fs.readFileSync('./playlistCover.jpg').toString('base64')
 
     server.listen(8080)
+
+    var connectionData = await KahootLogin("9888341")
+    setTimeout((connectionData) => {
+        SetKahootName(connectionData.connection, connectionData.meta, "B")
+    }, 5000, connectionData)
 }
 
 async function GenerateUser(user, accessToken) {
@@ -183,6 +184,7 @@ async function SendSpotifyRequest(url, params, user) {
         response.responseStatus = request.status
         return response
     } else if (request.status == 401) {
+        console.log(await request.text())
         var refreshReq = await fetch(`https://accounts.spotify.com/api/token?grant_type=refresh_token&refresh_token=${user.refresh_token}`, {
             method: "POST",
             headers: {
@@ -206,7 +208,7 @@ async function GetPlayingSong(user) {
     var playbackState = await SendSpotifyRequest("https://api.spotify.com/v1/me/player", {
         method: "GET",
         headers: {
-            "authorization": "Authorization: Bearer " + user.access_token
+            "Authorization": "Bearer " + user.access_token
         }
     }, user)
 
@@ -245,6 +247,195 @@ async function SetPlaylistTracks(user, tracks) {
     }, user)
 }
 
-async function KahootHandshake(pin) {
+async function KahootLogin(pin) {
+    var reserveReq = await fetch(`https://kahoot.it/reserve/session/${pin}/?${new Date().getTime()}`)
+    var sessionToken = reserveReq.headers.get("x-kahoot-session-token")
+    var reservation = await reserveReq.json()
+    
+    var decodedSessionToken = DecodeKahootSessionToken(sessionToken, reservation.challenge)
+
+    const KahootConnection = new ws.WebSocket(`https://kahoot.it/cometd/${pin}/${decodedSessionToken}`)
+    var connectionMeta = {
+        id: 1,
+        pin: pin,
+        startTime: new Date().getTime(),
+        clientID: ""
+    }
+
+    KahootConnection.on("open", event => {
+        KahootConnection.send(JSON.stringify({
+            advice: {
+                timeout: 60000,
+                interval: 0
+            },
+            channel: "/meta/handshake",
+            ext: {
+                ack: true,
+                timesync: {tc: new Date().getTime(), l: 0, o: 0}
+            },
+            id: connectionMeta.id.toString(),
+            minimum_version: "1.0",
+            supportedConnectionTypes: ["websocket", "long-polling", "callback-polling"],
+            version: "1.0"
+        }))
+        connectionMeta.id++
+
+        console.log("Connected to Kahoot!")
+    })
+
+    KahootConnection.on("message", event => {
+        var data = JSON.parse(event.toString())[0]
+
+        var channel = data.channel
+
+        if (channel == "/meta/handshake") {
+            console.log(`--> ${channel}`)
+
+            connectionMeta.clientID = data.clientId
+
+            KahootConnection.send(JSON.stringify({
+                advice: {
+                    timeout: 0
+                },
+                channel: "/meta/connect",
+                clientId: connectionMeta.clientID,
+                connectionType: "websocket",
+                ext: {
+                    ack: true,
+                    timesync: GetKahootTimesync(connectionMeta.startTime)
+                },
+                id: connectionMeta.id.toString()
+            }))
+            connectionMeta.id++
+            console.log(`<-- /meta/connect`)
+        } else if (channel == "/meta/connect") {
+            console.log(`--> ${channel}`)
+            console.log(data.ext.ack)
+
+            KahootConnection.send(JSON.stringify({
+                channel: "/meta/connect",
+                clientId: connectionMeta.clientID,
+                connectionType: "websocket",
+                ext: {
+                    ack: data.ext.ack,
+                    timesync: GetKahootTimesync(connectionMeta.startTime)
+                },
+                id: connectionMeta.id.toString()
+            }))
+            connectionMeta.id++
+            console.log(`<-- /meta/connect`)
+        } else if (channel == "/service/controller") {
+            console.log(`--> ${channel}`)
+
+            if (data.data != undefined) {
+                KahootConnection.send(JSON.stringify({
+                    channel: "/service/controller",
+                    clientId: connectionMeta.clientID,
+                    data: {
+                        gameid: connectionMeta.pin,
+                        type: "message",
+                        host: "kahoot.it",
+                        id: 16,
+                        content: '{"usingNamerator":false}'
+                    },
+                    ext: {},
+                    id: connectionMeta.id.toString()
+                }))
+                connectionMeta.id++
+                console.log(`<-- /service/controller`)
+            }
+        } else if (channel == "/service/status") {console.log(`--> ${channel}`)} 
+        else if (channel == "/service/player") {
+            console.log(`--> ${channel}`)
+
+            var actionID = data.data.id
+            var actionData = JSON.parse(data.data.content)
+
+            if (actionID == 14) { // Connected
+
+            } else if (actionID == 17) { // Connection Ext.
+                
+            } else if (actionID == 9) { // Quiz Started
+                console.log("Started Quiz")
+            } else if (actionID == 1) { // Question Loading
+                console.log(`Question #${actionData.questionIndex} (${actionData.gameBlockType}): ${actionData.title}`)
+            } else if (actionID == 2) { // Question Start
+                for (var i = 0; i < actionData.choices.length; i++) {
+                    console.log(`${i}: ${actionData.choices[i].answer}`)
+                }
+            }
+        } else {
+            console.log(`--? ${channel}`)
+            console.log(data)
+        }
+    })
+
+    return {
+        connection: KahootConnection,
+        meta: connectionMeta
+    }
+}
+
+function GetKahootTimesync(startTime) {
+    var currentTime = new Date().getTime()
+
+    return {
+        tc: currentTime,
+        l: currentTime - startTime,
+        o: currentTime - startTime
+    }
+}
+
+function DecodeKahootChallenge(challenge) {
+    var de = /'(\d*[a-z]*[A-Z]*)\w+'/
+    var pe = challenge.search("=")
+    var me = challenge.slice(pe + 1)
+    var st = me.search(";")
+    var Et = me.slice(0, Math.max(0, st)).trim()
+    var _t = de.exec(challenge)
+
+    return {
+        message: (_t && _t.length > 0 ? _t[0] : "").slice(1, -1),
+        offsetEquation: Et
+    }
+}
+
+function DecodeKahootSessionToken(sessionToken, challenge) {
+    var decodedChallenge = DecodeKahootChallenge(challenge)
+
+    const decode = message => message.replaceAll(/./g, (char, position) => String.fromCharCode((char.charCodeAt(0) * position + eval(decodedChallenge.offsetEquation)) % 77 + 48));
+    var answeredChallenge = decode(decodedChallenge.message)
+    var decodedSessionToken = Buffer.from(sessionToken, "base64").toString('utf8')
+    
+    var finalSessionToken = ""
+    for (var i = 0; i < decodedSessionToken.length; i++) {
+        var sessionTokenValue = decodedSessionToken.charCodeAt(i)
+        var challengeValue = answeredChallenge.charCodeAt(i % answeredChallenge.length)
+        var xorValue = sessionTokenValue ^ challengeValue
+        finalSessionToken += String.fromCharCode(xorValue)
+    }
+
+    return finalSessionToken
+}
+
+function SetKahootName(connection, connectionMeta, name) {
+    connection.send(JSON.stringify({
+        channel: "/service/controller",
+        clientId: connectionMeta.clientID,
+        data: {
+            content: "{}",
+            gameid: connectionMeta.pin,
+            host: "kahoot.it",
+            name: name,
+            type: "login"
+        },
+        ext: {},
+        id: connectionMeta.id.toString()
+    }))
+    connectionMeta.id++
+    console.log(`<-- /service/controller`)
+}
+
+function AnswerKahootQuizQuestion(connection, connectionMeta, answerIndex) {
 
 }
