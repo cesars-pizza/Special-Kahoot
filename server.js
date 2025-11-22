@@ -1,9 +1,13 @@
 const http = require('http')
 const fs = require('fs')
 const ws = require('ws')
+const googleAuth = require('@google-cloud/local-auth')
+const googleAPI = require('googleapis')
+const googleAuthLib = require('google-auth-library')
+const nodePath = require('node:path')
 
 /**
- * @type {{spotify:{clientID:string,clientSecret:string,scope:string,redirectURI:string,state:string,"songMap":{Letters:{A:string,B:string,C:string,D:string,E:string,F:string,G:string,H:string,I:string,J:string,K:string,L:string,M:string,N:string,O:string,P:string,Q:string,R:string,S:string,T:string,U:string,V:string,W:string,X:string,Y:string,Z:string},Space:string,Finish:string,QuizAnswers:{Red:string,Yellow:string,Green:string,Blue:string}}}}}
+ * @type {{spotify:{clientID:string,clientSecret:string,scope:string,redirectURI:string,state:string,"songMap":{Letters:{A:string,B:string,C:string,D:string,E:string,F:string,G:string,H:string,I:string,J:string,K:string,L:string,M:string,N:string,O:string,P:string,Q:string,R:string,S:string,T:string,U:string,V:string,W:string,X:string,Y:string,Z:string},Space:string,Finish:string,QuizAnswers:{Red:string,Yellow:string,Green:string,Blue:string}}},googleSlides:{APIKey:string,clientID:string,scopes:string[]}}}
  */
 var config = {}
 var users = {}
@@ -20,6 +24,9 @@ var activeGames = []
 
 var keyboardLetterSongs = []
 var quizAnswerSongs = []
+
+/** @type {googleAPI.slides_v1.Slides} */
+var slidesAPI = {}
 
 const server = http.createServer(async (request, response) => {
     url = {
@@ -216,11 +223,15 @@ async function Main() {
         config.spotify.songMap.QuizAnswers.Green
     ]
 
+    await AuthenticateGoogle()
+
     server.listen(8080)
 
     for (var i = 0; i < userKeys.length; i++) {
         SetSpotifyPlaylistTracks(users[userKeys[i]], [])
     }
+
+    console.log("Started")
 }
 
 async function GenerateUser(user, accessToken) {
@@ -596,4 +607,12 @@ function QuitKahoot(user) {
     user.kahootConnection.close()
     user = "idle"
     SetSpotifyPlaylistTracks(users[userKeys[i]], activeGames.map(game => game.song))
+}
+
+async function AuthenticateGoogle() {
+    const auth = new googleAuthLib.GoogleAuth({
+        scopes: ["https://www.googleapis.com/auth/presentations"]
+    })
+
+    slidesAPI = googleAPI.google.slides({version: "v1", auth})
 }

@@ -43,5 +43,10 @@
                 "Blue": "6nJiTp0PT9do3KLwTCVsZA"
             }
         }
+    },
+    "googleSlides": {
+        "APIKey": "",
+        "clientID": "",
+        "scopes": ["https://www.googleapis.com/auth/drive.file"]
     }
 }
