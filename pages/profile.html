@@ -4,6 +4,7 @@
         <title>KAHOOO</title>
     </head>
     <body>
+        <div>ID: <span id="id">-</span></div>
         <div>Name: <span id="name">-</span></div>
         <img src="" id="img">
         <div>Access Token: <span id="acctok">-</span></div>
@@ -16,24 +17,82 @@
 
         <br>
 
-        <p>You can access this page at any time by reconnecting your account.</p>
+        <div>Add Kahoot Game: <input type="number" id="pinInput" placeholder="Game Pin"> + <input type="text" id="songInput" placeholder="Spotify Song Link"> <button onclick="AddGame()">Add</button></div>
+        <div id="games"></div>
 
         <script>
+            var gamePins = []
+            var userID = ""
+
             Main()
             async function Main() {
                 var userDataReq = await fetch(`/userdat${document.location.search}`)
                 var userData = await userDataReq.json()
+
+                userID = userData.id
                 
+                document.getElementById("id").innerText = userData.id
                 document.getElementById("name").innerText = userData.name
                 document.getElementById("img").src = userData.picture
                 document.getElementById("acctok").innerText = userData.access_token
                 document.getElementById("reftok").innerText = userData.refresh_token
+                document.getElementById("head").innerText = userData.head
                 document.getElementById("playlistID").innerText = userData.playlistID
                 document.getElementById("playlistURL").innerText = userData.playlistURL
                 document.getElementById("playlistURL").href = userData.playlistURL
                 document.getElementById("presentationID").innerText = userData.presentationID
                 document.getElementById("presentationURL").innerText = userData.presentationURL
                 document.getElementById("presentationURL").href = userData.presentationURL
+
+                gamePins = userData.currentGamePins
+                for (var i = 0; i < gamePins.length; i++) {
+                    var game = document.createElement('div')
+                    game.innerText = `Game: ${gamePins[i]}   `
+
+                    var removeBtn = document.createElement('button')
+                    removeBtn.innerText = "Remove"
+                    removeBtn.id = `btn${i}`
+                    removeBtn.onclick = (ev) => {RemoveGame(ev.srcElement.id.substring(3))}
+                    game.append(removeBtn)
+
+                    document.getElementById('games').append(game)
+                }
+            }
+
+            function RemoveGame(id) {
+                id = Number(id)
+
+                fetch(`rmgame?pin=${encodeURIComponent(gamePins[id])}&user=${encodeURIComponent(userID)}`)
+
+                document.getElementById(`btn${id}`).parentElement.remove()
+                gamePins.splice(id, 1)
+
+                for (var i = id; i < gamePins.length; i++) {
+                    console.log(`btn${i + 1}`)
+                    document.getElementById(`btn${i + 1}`).id = `btn${i}`
+                }
+            }
+
+            async function AddGame() {
+                var pin = document.getElementById("pinInput").value
+                var song = document.getElementById("songInput").value
+
+                var addReq = await fetch(`addgame?pin=${encodeURIComponent(pin)}&song=${encodeURIComponent(song)}&user=${encodeURIComponent(userID)}`)
+                if (addReq.ok) {
+                    var game = document.createElement('div')
+                    game.innerText = `Game: ${pin}   `
+
+                    var removeBtn = document.createElement('button')
+                    removeBtn.innerText = "Remove"
+                    removeBtn.id = `btn${gamePins.length}`
+                    removeBtn.onclick = (ev) => {RemoveGame(ev.srcElement.id.substring(3))}
+                    game.append(removeBtn)
+
+                    document.getElementById('games').append(game)
+                    gamePins.push(pin)
+                } else {
+                    alert(await addReq.text())
+                }
             }
         </script>
     </body>

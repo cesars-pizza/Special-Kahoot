@@ -3,7 +3,7 @@ const fs = require('fs')
 const ws = require('ws')
 
 /**
- * @type {{spotify:{clientID:string,clientSecret:string,scope:string,redirectURI:string,state:string}}}
+ * @type {{spotify:{clientID:string,clientSecret:string,scope:string,redirectURI:string,state:string,"songMap":{Letters:{A:string,B:string,C:string,D:string,E:string,F:string,G:string,H:string,I:string,J:string,K:string,L:string,M:string,N:string,O:string,P:string,Q:string,R:string,S:string,T:string,U:string,V:string,W:string,X:string,Y:string,Z:string},Space:string,Finish:string}}}}
  */
 var config = {}
 var users = {}
@@ -16,18 +16,17 @@ var profilePage = ""
 
 var playlistCover = ""
 
-var activeGames = [
-    {pin: "", owner: "", song: ""}
-]
+var activeGames = []
+
+var keyboardLetterSongs = []
 
 const server = http.createServer(async (request, response) => {
-    var url = decodeURIComponent(request.url)
     url = {
-        path: url.split("?")[0],
-        uri: url.split("?")[1]
+        path: request.url.split("?")[0],
+        uri: request.url.split("?")[1]
     }
     if (url.uri != undefined) {
-        var values = url.uri.split("&").map(value => [value.split("=")[0], value.split("=")[1]])
+        var values = url.uri.split("&").map(value => [decodeURIComponent(value.split("=")[0]), decodeURIComponent(value.split("=")[1])])
         url.uri = {}
         for (var i = 0; i < values.length; i++) {
             url.uri[values[i][0]] = values[i][1]
@@ -73,6 +72,29 @@ const server = http.createServer(async (request, response) => {
     } else if (url.path == "/userdat") {
         response.writeHead(200, {"content-type": "application/json"})
         response.end(JSON.stringify(users[url.uri.id]))
+    } else if (url.path == "/rmgame") {
+        activeGames.splice(activeGames.map(game => game.pin).indexOf(url.uri.pin), 1)
+        users[url.uri.user].currentGamePins.splice(users[url.uri.user].currentGamePins.indexOf(url.uri.pin), 1)
+
+        response.writeHead(200, {"content-type": "application/json"})
+        response.end("")
+
+        var userKeys = Object.keys(users)
+        for (var i = 0; i < userKeys.length; i++) {
+            if (users[userKeys[i]].state == "idle") SetSpotifyPlaylistTracks(users[userKeys[i]], activeGames.map(game => game.song))
+        }
+    } else if (url.path == "/addgame") {
+        var songID = url.uri.song.substring(url.uri.song.lastIndexOf("/") + 1, url.uri.song.indexOf("?"))
+        activeGames.push({pin: url.uri.pin, song: songID, owner: url.uri.user})
+        users[url.uri.user].currentGamePins.push(url.uri.pin)
+
+        response.writeHead(200, {"content-type": "application/json"})
+        response.end("")
+
+        var userKeys = Object.keys(users)
+        for (var i = 0; i < userKeys.length; i++) {
+            if (users[userKeys[i]].state == "idle") SetSpotifyPlaylistTracks(users[userKeys[i]], activeGames.map(game => game.song))
+        }
     } else {
         response.writeHead(200, {"content-type": "text/html"})
         response.end(connectPage)
@@ -83,13 +105,46 @@ setInterval(async () => {
     fs.writeFileSync('./users.json', JSON.stringify(users))
     console.log("Saved")
 
-    var userKeys = Object.keys(users)
-    for (var i = 0; i < userKeys.length; i++) {
-        //console.log(await GetPlayingSong(users[userKeys[i]]))
-        //await SetPlaylistTracks(users[userKeys[i]], [sampleTracks[sampleIndex]])
-        //sampleIndex = (sampleIndex + 1) % 5
+    if (activeGames.length > 0) {
+        var userKeys = Object.keys(users)
+        for (var i = 0; i < userKeys.length; i++) {
+            if (users[userKeys].state == "idle") {
+                var currentTrack = await GetPlayingSong(users[userKeys[i]])
+                if (currentTrack.type == "track") {
+                    var selectedGame = activeGames[activeGames.map(game => game.song).indexOf(currentTrack.track)]
+
+                    var kahoot = await KahootLogin(selectedGame.pin)
+                    users[userKeys[i]].state = "name"
+                    users[userKeys[i]].kahootConnection = kahoot.connection
+                    users[userKeys[i]].kahootConnectionMeta = kahoot.meta
+                    SetSpotifyPlaylistTracks(users[userKeys[i]], keyboardLetterSongs)
+                }
+            } else if (users[userKeys].state == "name") {
+                var currentTrack = await GetPlayingSong(users[userKeys[i]])
+                if (currentTrack.type == "none" || currentTrack.type == "other") {
+                    console.log("Quit Kahoot")
+                    users[userKeys[i]].kahootConnection.close()
+                    users[userKeys[i]].state = "idle"
+                    SetSpotifyPlaylistTracks(users[userKeys[i]], activeGames.map(game => game.song))
+                } else if (currentTrack.type == "track") {
+                    var keyboardInput = GetSpotifyKeyboardInput(currentTrack.track)
+                    
+                    if (users[userKeys[i]].kahootConnectionMeta.nickname == "")
+                        SetSpotifyPlaylistTracks(users[userKeys[i]], keyboardLetterSongs.concat([config.spotify.songMap.Space, config.spotify.songMap.Finish]))
+                    
+                    users[userKeys[i]].kahootConnectionMeta.nickname += keyboardInput.character
+                    console.log(`Setting Name: ${users[userKeys[i]].kahootConnectionMeta.nickname}`)
+                    if (keyboardInput.finish) {
+                        console.log("Joined Lobby")
+                        SetKahootName(users[userKeys[i]].kahootConnection, users[userKeys[i]].kahootConnectionMeta, users[userKeys[i]].kahootConnectionMeta.nickname)
+                        SetSpotifyPlaylistTracks(users[userKeys[i]], [])
+                        users[userKeys[i]].state = "lobby"
+                    }
+                }
+            }
+        }
     }
-}, 10000);
+}, 15000);
 
 Main()
 async function Main() {
@@ -104,6 +159,9 @@ async function Main() {
     var userKeys = Object.keys(users)
     for (var i = 0; i < userKeys.length; i++) {
         if (users[userKeys[i]].head) headUser = users[userKeys[i]]
+
+        users[userKeys[i]].currentGamePins = []
+        users[userKeys[i]].state = "idle"
     }
 
     connectPage = fs.readFileSync('./pages/connect.html').toString('utf8')
@@ -124,12 +182,45 @@ async function Main() {
 
     playlistCover = fs.readFileSync('./playlistCover.jpg').toString('base64')
 
+    keyboardLetterSongs = [
+        config.spotify.songMap.Letters.A,
+        config.spotify.songMap.Letters.B,
+        config.spotify.songMap.Letters.C,
+        config.spotify.songMap.Letters.D,
+        config.spotify.songMap.Letters.E,
+        config.spotify.songMap.Letters.F,
+        config.spotify.songMap.Letters.G,
+        config.spotify.songMap.Letters.H,
+        config.spotify.songMap.Letters.I,
+        config.spotify.songMap.Letters.J,
+        config.spotify.songMap.Letters.K,
+        config.spotify.songMap.Letters.L,
+        config.spotify.songMap.Letters.M,
+        config.spotify.songMap.Letters.N,
+        config.spotify.songMap.Letters.O,
+        config.spotify.songMap.Letters.P,
+        config.spotify.songMap.Letters.Q,
+        config.spotify.songMap.Letters.R,
+        config.spotify.songMap.Letters.S,
+        config.spotify.songMap.Letters.T,
+        config.spotify.songMap.Letters.U,
+        config.spotify.songMap.Letters.V,
+        config.spotify.songMap.Letters.W,
+        config.spotify.songMap.Letters.X,
+        config.spotify.songMap.Letters.Y,
+        config.spotify.songMap.Letters.Z
+    ]
+
     server.listen(8080)
 
-    var connectionData = await KahootLogin("9888341")
-    setTimeout((connectionData) => {
-        SetKahootName(connectionData.connection, connectionData.meta, "B")
-    }, 5000, connectionData)
+    for (var i = 0; i < userKeys.length; i++) {
+        SetSpotifyPlaylistTracks(users[userKeys[i]], [])
+    }
+
+    //var connectionData = await KahootLogin("9888341")
+    //setTimeout((connectionData) => {
+    //    SetKahootName(connectionData.connection, connectionData.meta, "B")
+    //}, 5000, connectionData)
 }
 
 async function GenerateUser(user, accessToken) {
@@ -141,7 +232,12 @@ async function GenerateUser(user, accessToken) {
         refresh_token: accessToken.refresh_token,
         head: headUser == undefined,
         presentationID: "",
-        presentationURL: ""
+        presentationURL: "",
+        currentGamePins: [],
+        state: "idle",
+        kahootConnection: {},
+        kahootConnectionMeta: {},
+        backgroundTrack: "7IEdlE4ZwzPDxnoWFv10aj"
     }
 
     if (headUser == undefined) headUser = userEntry
@@ -175,7 +271,9 @@ async function GenerateUser(user, accessToken) {
 
 async function SendSpotifyRequest(url, params, user) {
     var request = await fetch(url, params)
-    console.log(`${url} -> ${request.status}`)
+    var shortenedURL = url
+    if (shortenedURL.length > 100) shortenedURL = url.substring(0, 97) + "..."
+    console.log(`${shortenedURL} -> ${request.status}`)
     if (request.ok) {
         var response = await request.text()
         if (response.length > 0)
@@ -184,7 +282,6 @@ async function SendSpotifyRequest(url, params, user) {
         response.responseStatus = request.status
         return response
     } else if (request.status == 401) {
-        console.log(await request.text())
         var refreshReq = await fetch(`https://accounts.spotify.com/api/token?grant_type=refresh_token&refresh_token=${user.refresh_token}`, {
             method: "POST",
             headers: {
@@ -192,11 +289,17 @@ async function SendSpotifyRequest(url, params, user) {
                 "Authorization": `Basic ${Buffer.from(`${config.spotify.clientID}:${config.spotify.clientSecret}`).toString('base64')}`
             }
         })
-        var refreshedTokens = await refreshReq.json()
-        user.access_token = refreshedTokens.access_token
-        if (refreshedTokens.refresh_token != undefined) user.refresh_token = refreshedTokens.refresh_token
-        
-        return await SendSpotifyRequest(url, params, user)
+        var refreshData = await refreshReq.text()
+        if (!refreshReq.ok) {
+            console.log("Failed to refresh access token!")
+            return {}
+        } else {
+            var refreshedTokens = JSON.parse(refreshData)
+            user.access_token = refreshedTokens.access_token
+            if (refreshedTokens.refresh_token != undefined) user.refresh_token = refreshedTokens.refresh_token
+            
+            return await SendSpotifyRequest(url, params, user)
+        }
     } else {
         var response = await request.text()
         console.log(`${request.status} - ${response}`)
@@ -238,13 +341,13 @@ async function GetPlayingSong(user) {
     }
 }
 
-async function SetPlaylistTracks(user, tracks) {
+async function SetSpotifyPlaylistTracks(user, tracks) {
     await SendSpotifyRequest(`https://api.spotify.com/v1/playlists/${user.playlistID}/tracks?uris=${encodeURIComponent(tracks.map(track => `spotify:track:${track}`).join(','))}`, {
         method: "PUT",
         headers: {
-            "Authorization": `Bearer ${headUser.access_token}`,
+            "Authorization": `Bearer ${headUser.access_token}`
         }
-    }, user)
+    }, headUser)
 }
 
 async function KahootLogin(pin) {
@@ -259,7 +362,8 @@ async function KahootLogin(pin) {
         id: 1,
         pin: pin,
         startTime: new Date().getTime(),
-        clientID: ""
+        clientID: "",
+        nickname: ""
     }
 
     KahootConnection.on("open", event => {
@@ -310,7 +414,6 @@ async function KahootLogin(pin) {
             console.log(`<-- /meta/connect`)
         } else if (channel == "/meta/connect") {
             console.log(`--> ${channel}`)
-            console.log(data.ext.ack)
 
             KahootConnection.send(JSON.stringify({
                 channel: "/meta/connect",
@@ -434,6 +537,19 @@ function SetKahootName(connection, connectionMeta, name) {
     }))
     connectionMeta.id++
     console.log(`<-- /service/controller`)
+}
+
+function GetSpotifyKeyboardInput(track) {
+    if (track == config.spotify.songMap.Finish) return {finish: true, character: ""}
+    else if (track == config.spotify.songMap.Space) return {finish: false, character: " "}
+    else {
+        var alphabetKeys = Object.keys(config.spotify.songMap.Letters)
+        for (var i = 0; i < alphabetKeys.length; i++) {
+            if (track == config.spotify.songMap.Letters[alphabetKeys[i]]) return {finish: false, character: alphabetKeys[i]}
+        }
+    }
+
+    return {finish: false, character: "?"}
 }
 
 function AnswerKahootQuizQuestion(connection, connectionMeta, answerIndex) {

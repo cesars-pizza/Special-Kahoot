@@ -4,6 +4,44 @@
         "clientSecret": "this will be a random looking string (don't share with anyone)",
         "scope": "ugc-image-upload user-library-modify playlist-modify-private playlist-modify-public user-read-currently-playing user-read-playback-state",
         "redirectURI": "https://www.mycoolwebsite.com/auth",
-        "state": "password"
+        "state": "password",
+        "songMap": {
+            "Letters": {
+                "A": "0RoA7ObU6phWpqhlC9zH4Z",
+                "B": "0YNFWmBH21hnEzyaWp60CN",
+                "C": "5rurggqwwudn9clMdcchxT",
+                "D": "5QMrH5nszZZR3nefIj6Mar",
+                "E": "3ND1Fohc2kkhgu4gSQ2DbA",
+                "F": "1CtOCnWYfIwVgIKiR2Lufw",
+                "G": "1CPZ5BxNNd0n0nF4Orb9JS",
+                "H": "3HaeSBEqEUIWHx7yGEDxXh",
+                "I": "6nkcPGa0sr24NFCc5l5UjE",
+                "J": "5cii8kYu4Ti6UigNiRCpCw",
+                "K": "11u4Q89CWq1R3RKpiIFDz2",
+                "L": "2IZiwBnwtrc0Fd8VIwAPeG",
+                "M": "6PbzoQadu2HwTEzckAzaw2",
+                "N": "7qfoq1JFKBUEIvhqOHzuqX",
+                "O": "2z1o3f89JMMzneTQXT8e0w",
+                "P": "1m9TZ1dpYEQnczSsI6z9Ku",
+                "Q": "670Te259H79f3TiiEgzd2B",
+                "R": "7BAIBStRNBpbFnSII7WS45",
+                "S": "2p0FjrYZlNhEejQOLXHP2n",
+                "T": "5PuSkObBMygbWjRuqy7lqv",
+                "U": "4MimthDKiYVMCqDBJEiw1U",
+                "V": "1U2p6UhWe2tXu3oJzuo799",
+                "W": "2MPDYUvtXgRAHzr6dJzTxq",
+                "X": "3lhd2kLQIH9A74ocQoQroY",
+                "Y": "1lNGwNQX4IrvDwgETwyPjR",
+                "Z": "4zDfgax6Ihb0UWdour1ZEs"
+            },
+            "Space": "3N1V03yrqyNPo5A4Fu2Wd7",
+            "Finish": "0SwzbyZ2JFyBmzkpdXO1E6",
+            "QuizAnswers": {
+                "Red": "",
+                "Yellow": "",
+                "Green": "",
+                "Blue": ""
+            }
+        }
     }
 }
