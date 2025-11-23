@@ -47,6 +47,28 @@
     "googleSlides": {
         "APIKey": "",
         "clientID": "",
-        "scopes": ["https://www.googleapis.com/auth/drive.file"]
+        "scopes": ["https://www.googleapis.com/auth/drive.file"],
+        "colors": {
+            "white": "ffffff",
+            "gray": "b2b2b2",
+            "black": "000000",
+            "purple0": "6f17c1",
+            "purple1": "3b1378",
+            "purple2": "35116d",
+            "purple3": "2d0e5b",
+            "purple4": "1b0932",
+            "answerRed": "e21b3c",
+            "answerYellow": "d89e00",
+            "answerGreen": "26890c",
+            "answerBlue": "1368ce",
+            "correctAnswer": "66bf39",
+            "incorrectAnswer": "ff3355",
+            "bronzeInner": "e24000",
+            "bronzeOuter": "eb680d",
+            "silverInner": "737373",
+            "silverOuter": "cccccc",
+            "goldInner": "ffa600",
+            "goldOuter": "ffc00d"
+        }
     }
 }
