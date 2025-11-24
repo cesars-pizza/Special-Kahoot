@@ -89,7 +89,16 @@ const server = http.createServer(async (request, response) => {
 
         var userKeys = Object.keys(users)
         for (var i = 0; i < userKeys.length; i++) {
-            if (users[userKeys[i]].state == "idle") SetSpotifyPlaylistTracks(users[userKeys[i]], activeGames.map(game => game.song))
+            if (users[userKeys[i]].state == "idle") {
+                SetSpotifyPlaylistTracks(users[userKeys[i]], activeGames.map(game => game.song))
+                SetPresentationPage_AvailableGames(users[userKeys[i]].presentationID, activeGames.map(game => {
+                    return {
+                        pin: game.pin,
+                        songTitle: game.song,
+                        songCover: "http://67.185.133.83:8080/song_cover?location=ab67616d00001e02669a41183a8feb2e9e1a0dd6"
+                    }
+                }))
+            }
         }
     } else if (url.path == "/addgame") {
         var songID = url.uri.song.substring(url.uri.song.lastIndexOf("/") + 1, url.uri.song.indexOf("?"))
@@ -101,7 +110,16 @@ const server = http.createServer(async (request, response) => {
 
         var userKeys = Object.keys(users)
         for (var i = 0; i < userKeys.length; i++) {
-            if (users[userKeys[i]].state == "idle") SetSpotifyPlaylistTracks(users[userKeys[i]], activeGames.map(game => game.song))
+            if (users[userKeys[i]].state == "idle") {
+                SetSpotifyPlaylistTracks(users[userKeys[i]], activeGames.map(game => game.song))
+                SetPresentationPage_AvailableGames(users[userKeys[i]].presentationID, activeGames.map(game => {
+                    return {
+                        pin: game.pin,
+                        songTitle: game.song,
+                        songCover: "http://67.185.133.83:8080/song_cover?location=ab67616d00001e02669a41183a8feb2e9e1a0dd6"
+                    }
+                }))
+            }
         }
     } else if (url.path == "/song_cover") {
         var imgData = fs.readFileSync(`./song_covers/${url.uri.location}.png`)
@@ -126,7 +144,7 @@ setInterval(async () => {
     if (activeGames.length > 0) {
         var userKeys = Object.keys(users)
         for (var i = 0; i < userKeys.length; i++) {
-            if (users[userKeys].state == "idle") {
+            if (users[userKeys[i]].state == "idle") {
                 var currentTrack = await GetPlayingSong(users[userKeys[i]])
                 if (currentTrack.type == "track") {
                     var selectedGame = activeGames[activeGames.map(game => game.song).indexOf(currentTrack.track)]
@@ -136,8 +154,9 @@ setInterval(async () => {
                     users[userKeys[i]].kahootConnection = kahoot.connection
                     users[userKeys[i]].kahootConnectionMeta = kahoot.meta
                     SetSpotifyPlaylistTracks(users[userKeys[i]], keyboardLetterSongs)
+                    SetPresentationPage_EnterNickname(users[userKeys[i]].presentationID, "", selectedGame.pin.toString(), currentTrack.repeat, undefined)
                 }
-            } else if (users[userKeys].state == "name") {
+            } else if (users[userKeys[i]].state == "name") {
                 var currentTrack = await GetPlayingSong(users[userKeys[i]])
                 if (currentTrack.type == "none" || currentTrack.type == "other") {
                     QuitKahoot(users[userKeys[i]])
@@ -153,8 +172,14 @@ setInterval(async () => {
                         console.log("Joined Lobby")
                         SetKahootName(users[userKeys[i]].kahootConnection, users[userKeys[i]].kahootConnectionMeta, users[userKeys[i]].kahootConnectionMeta.nickname)
                         SetSpotifyPlaylistTracks(users[userKeys[i]], [users[userKeys[i]].backgroundTrack])
+                        SetPresentationPage_Connected(users[userKeys[i]].presentationID, users[userKeys[i]].kahootConnectionMeta.nickname, users[userKeys[i]].kahootConnectionMeta.pin, currentTrack.repeat, {title: "Lobby Music Christmas Edition", artist: "Kahoot!", cover: "http://67.185.133.83:8080/song_cover?location=ab67616d00001e02669a41183a8feb2e9e1a0dd6"})
                         users[userKeys[i]].state = "lobby"
-                    }
+                    } else SetPresentationPage_EnterNickname(users[userKeys[i]].presentationID, users[userKeys[i]].kahootConnectionMeta.nickname, users[userKeys[i]].kahootConnectionMeta.pin, currentTrack.repeat, undefined)
+                }
+            } else if (users[userKeys[i]].state == "finish") {
+                var currentTrack = await GetPlayingSong(users[userKeys[i]])
+                if (currentTrack.type == "none" || currentTrack.type == "other") {
+                    QuitKahoot(users[userKeys[i]])
                 }
             }
         }
@@ -244,17 +269,9 @@ async function Main() {
 
     for (var i = 0; i < userKeys.length; i++) {
         SetSpotifyPlaylistTracks(users[userKeys[i]], [])
+        SetPresentationPage_AvailableGames(users[userKeys[i]].presentationID, [])
     }
 
-    //SetPresentationPage_AvailableGames(headUser.presentationID, [
-    //    {pin: "817563", songTitle: "Link Up (Metro Boomin & Don Toliver, Wizkid feat. BEAM & Toian) - Spider-Verse Remix (Spider-Man: Across the Spider-Verse)", songCover: "http://67.185.133.83:8080/song_cover?location=ab67616d00001e026ed9aef791159496b286179f"},
-    //    {pin: "452636", songTitle: "Between the Lines", songCover: "http://67.185.133.83:8080/song_cover?location=ab67616d0000e1a345ed27c2e2a8f723f350f96e"},
-    //    {pin: "3858417", songTitle: "A Hatful of Dreams", songCover: "http://67.185.133.83:8080/song_cover?location=ab67616d0000e1a3427d87c552dadb429dfeaf34"},
-    //    {pin: "105729", songTitle: "Seasons of Love", songCover: "http://67.185.133.83:8080/song_cover?location=ab67616d0000e1a3d272c37389bd3d9c20564166"},
-    //    {pin: "5829578", songTitle: "Something to Hold Onto"},
-    //    {pin: "572659", songTitle: "Inner Thoughts (Reprise)"},
-    //    {pin: "264957", songTitle: "Say it in Other Words"},
-    //])
 
     //SetPresentationPage_EnterNickname(headUser.presentationID, "Hello", "756294", true, "Google Slides API Is Angered\nWatch Out")
 
@@ -268,7 +285,7 @@ async function Main() {
 
     //SetPresentationPage_PostQuestion(headUser.presentationID, "Cesar's Pizza", "294084", false, 4, 76, 2576, "no response", 1, 950, 2)
 
-    SetPresentationPage_EndOfGame(headUser.presentationID, "Cesar's Pizza", "486729", 12, 12, 10456, 7)
+    //SetPresentationPage_EndOfGame(headUser.presentationID, "Cesar's Pizza", "486729", 12, 12, 10456, 7)
 
     //SetPresentationPage_Quit(headUser.presentationID)
 
@@ -323,6 +340,14 @@ async function GenerateUser(user, accessToken) {
     })
     userEntry.presentationID = presentation.data.presentationId
     userEntry.presentationURL = `https://docs.google.com/presentation/d/${presentation.data.presentationId}/edit?slide=id.p#slide=id.p`
+    
+    await SetPresentationPage_AvailableGames(userEntry.presentationID, activeGames.map(game => {
+        return {
+            pin: game.pin,
+            songTitle: game.song,
+            songCover: "http://67.185.133.83:8080/song_cover?location=ab67616d00001e02669a41183a8feb2e9e1a0dd6"
+        }
+    }))
 
     users[user.id] = userEntry
 
@@ -425,7 +450,10 @@ async function KahootLogin(pin, user) {
         startTime: new Date().getTime(),
         clientID: "",
         nickname: "",
-        questionIndex: 0
+        questionIndex: 0,
+        totalQuestions: 0,
+        answeredLastQuestion: false,
+        score: 0
     }
 
     KahootConnection.on("open", event => {
@@ -523,15 +551,28 @@ async function KahootLogin(pin, user) {
                 
             } else if (actionID == 9) { // Quiz Started
                 console.log("Started Quiz")
+                SetPresentationPage_GetReady(user.presentationID, connectionMeta.nickname, connectionMeta.pin, true, "", false)
             } else if (actionID == 1) { // Question Loading
-                console.log(`Question #${actionData.questionIndex} (${actionData.gameBlockType}): ${actionData.title}`)
+                console.log(`Question #${actionData.questionIndex + 1} (${actionData.gameBlockType}): ${actionData.title}`)
+                SetPresentationPage_QuizQuestionPrep(user.presentationID, connectionMeta.nickname, connectionMeta.pin, true, actionData.questionIndex + 1, actionData.totalGameBlockCount, connectionMeta.score, actionData.title)
                 connectionMeta.questionIndex = actionData.questionIndex
+                connectionMeta.totalQuestions = actionData.totalGameBlockCount
             } else if (actionID == 2) { // Question Start
                 for (var i = 0; i < actionData.choices.length; i++) {
                     console.log(`${i}: ${actionData.choices[i].answer}`)
                 }
+                connectionMeta.answeredLastQuestion = false
                 SetSpotifyPlaylistTracks(user, quizAnswerSongs.slice(0, actionData.choices.length))
-                setTimeout((user, index) => {AnswerKahootQuizQuestion(user, index)}, 10000, user, connectionMeta.questionIndex)
+                SetPresentationPage_QuizQuestion(user.presentationID, connectionMeta.nickname, connectionMeta.pin, true, connectionMeta.questionIndex + 1, actionData.totalGameBlockCount, 15, actionData.title, actionData.choices.map(choice => choice.answer), actionData.image)
+                setTimeout((user, index) => {AnswerKahootQuizQuestion(user, index)}, 15000, user, connectionMeta.questionIndex)
+            } else if (actionID == 8) { // Post Question
+                SetSpotifyPlaylistTracks(user, [user.backgroundTrack])
+                SetPresentationPage_PostQuestion(user.presentationID, connectionMeta.nickname, connectionMeta.pin, true, connectionMeta.questionIndex + 1, connectionMeta.totalQuestions, actionData.totalScore, actionData.isCorrect ? "correct" : (connectionMeta.answeredLastQuestion ? "incorrect" : "no response"), actionData.rank, actionData.pointsData.questionPoints, actionData.pointsData.answerStreakPoints.streakLevel)
+                connectionMeta.score = actionData.totalScore
+            } else if (actionID == 13) { // End of Quiz
+                SetSpotifyPlaylistTracks(user, [user.backgroundTrack])
+                SetPresentationPage_EndOfGame(user.presentationID, connectionMeta.nickname, connectionMeta.pin, actionData.correctCount, actionData.correctCount + actionData.incorrectCount, actionData.totalScore, actionData.rank)
+                user.state = "finish"
             }
         } else {
             console.log(`--? ${channel}`)
@@ -634,6 +675,8 @@ async function AnswerKahootQuizQuestion(user, questionIndex) {
         }
     }
 
+    if (answerIndex != -1) user.kahootConnectionMeta.answeredLastQuestion = true
+
     user.kahootConnection.send(JSON.stringify({
         channel: "/service/controller",
         clientId: user.kahootConnectionMeta.clientID,
@@ -654,8 +697,20 @@ async function AnswerKahootQuizQuestion(user, questionIndex) {
 function QuitKahoot(user) {
     console.log("Quit Kahoot")
     user.kahootConnection.close()
-    user = "idle"
-    SetSpotifyPlaylistTracks(users[userKeys[i]], activeGames.map(game => game.song))
+    user.state = "idle"
+    SetSpotifyPlaylistTracks(user, activeGames.map(game => game.song))
+    SetPresentationPage_Quit(user.presentationID)
+    setTimeout((user) => {QuitKahoot2(user)}, 5000, user)
+}
+
+function QuitKahoot2(user) {
+    SetPresentationPage_AvailableGames(user.presentationID, activeGames.map(game => {
+        return {
+            pin: game.pin,
+            songTitle: game.song,
+            songCover: "http://67.185.133.83:8080/song_cover?location=ab67616d00001e02669a41183a8feb2e9e1a0dd6"
+        }
+    }))
 }
 
 async function AuthenticateGoogle() {
@@ -850,7 +905,7 @@ async function SetPresentationPage_GetReady(id, nickname, pin, repeatEnabled, qu
 
         CreatePresentationShape(newSlideID, "3", "RECTANGLE", {x: 10, y: 0.38}, {x: 0, y: 5.24}, config.googleSlides.colors.purple4, {color: config.googleSlides.colors.black, thickness: 0}),
 
-        CreatePresentationTextbox(newSlideID, "4", {x: 8.5, y: 2.13}, {x: 0.75, y: 2.36}, quizName, {size: 30, weight: 600, color: config.googleSlides.colors.white, alignment: {x: "CENTER", y: "TOP"}}),
+        //CreatePresentationTextbox(newSlideID, "4", {x: 8.5, y: 2.13}, {x: 0.75, y: 2.36}, quizName, {size: 30, weight: 600, color: config.googleSlides.colors.white, alignment: {x: "CENTER", y: "TOP"}}),
     )
 
     if (playingAgain) requests = requests.concat([CreatePresentationTextbox(newSlideID, "5", {x: 8.5, y: 1.03}, {x: 0.75, y: 1.33}, "Playing Again", {size: 50, weight: 600, color: config.googleSlides.colors.white, alignment: {x: "CENTER", y: "MIDDLE"}})])
